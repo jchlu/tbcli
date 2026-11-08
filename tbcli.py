@@ -189,6 +189,7 @@ def parse_args() -> argparse.Namespace:
         help=f"output file (default: {DEFAULT_OUTPUT})",
     )
     parser.add_argument("-o", "--output", dest="output_flag", metavar="FILE", help="output file (same as positional)")
+    parser.add_argument("--stdout", action="store_true", help="write links to stdout instead of a file")
     parser.add_argument("--env-file", help="path to .env.local (default: script dir, then cwd)")
     parser.add_argument("--config", help="path to config file (default: $XDG_CONFIG_HOME/tbcli/config)")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"TorBox API base URL (default: {DEFAULT_BASE_URL})")
@@ -203,7 +204,9 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.output and args.output_flag:
         parser.error("specify the output file either positionally or with -o, not both")
-    args.output = args.output or args.output_flag or DEFAULT_OUTPUT
+    if args.stdout and (args.output or args.output_flag):
+        parser.error("--stdout cannot be combined with an output file")
+    args.output = None if args.stdout else (args.output or args.output_flag or DEFAULT_OUTPUT)
     return args
 
 
@@ -233,7 +236,7 @@ def main() -> int:
         )
         return 2
 
-    output_path = Path(args.output).expanduser()
+    output_path = None if args.stdout else Path(args.output).expanduser()
     links: list[str] = []
     torrent_count = 0
     skipped_count = 0
@@ -282,17 +285,31 @@ def main() -> int:
         print("\ninterrupted", file=sys.stderr)
         return 130
 
-    try:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with output_path.open("w", encoding="utf-8") as handle:
+    if args.stdout:
+        try:
             for link in links:
-                handle.write(link + "\n")
-    except OSError as exc:
-        print(f"error: cannot write {output_path}: {exc}", file=sys.stderr)
-        return 1
+                print(link)
+            sys.stdout.flush()
+        except BrokenPipeError:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+            os.close(devnull)
+            return 1
+        destination = "stdout"
+    else:
+        assert output_path is not None
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with output_path.open("w", encoding="utf-8") as handle:
+                for link in links:
+                    handle.write(link + "\n")
+        except OSError as exc:
+            print(f"error: cannot write {output_path}: {exc}", file=sys.stderr)
+            return 1
+        destination = str(output_path)
 
     print(
-        f"Wrote {len(links)} links from {torrent_count} torrents to {output_path}"
+        f"Wrote {len(links)} links from {torrent_count} torrents to {destination}"
         + (f" ({skipped_count} torrents skipped, {failed_count} files failed)" if skipped_count or failed_count else ""),
         file=sys.stderr,
     )

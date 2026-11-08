@@ -101,7 +101,7 @@ Do not commit the key to this repository. `.env.local`, the XDG config file, and
 tbcli [OUTPUT] [options]
 ```
 
-`OUTPUT` is the file to write links to. If omitted, it defaults to `torbox_links.txt`. You can also use `-o FILE`; specifying both is an error.
+`OUTPUT` is the file to write links to. If omitted, it defaults to `torbox_links.txt`. You can also use `-o FILE`; specifying both is an error. Use `--stdout` to write links to stdout instead of a file.
 
 Examples:
 
@@ -117,6 +117,7 @@ Options:
 | Option | Description |
 | --- | --- |
 | `-o, --output FILE` | Output file (same as the positional argument) |
+| `--stdout` | Write links to stdout instead of a file |
 | `--config FILE` | Path to the config file |
 | `--env-file FILE` | Path to a legacy `.env.local` file |
 | `--base-url URL` | TorBox API base URL (default: `https://api.torbox.app/v1`) |
@@ -125,6 +126,22 @@ Options:
 | `-v, --verbose` | Show each torrent/file as it is processed |
 
 The default delay keeps request rates comfortably below TorBox's documented limit of 300 requests per minute. Increase it if you still encounter rate limiting.
+
+### Piping to a download client
+
+Use `--stdout` to write only the links to stdout, leaving progress and the summary on stderr so the output can be piped directly. For example, [aria2c](https://aria2.github.io/) accepts newline-separated URLs on stdin with `-i -`:
+
+```bash
+tbcli --stdout | aria2c -i -
+```
+
+aria2c is an external dependency and is not installed by `install.sh`. Install it separately with your package manager, for example on Debian/Ubuntu:
+
+```bash
+sudo apt install aria2
+```
+
+The same pattern works with any download client that accepts newline-separated URLs from stdin or a file. TorBox links expire after roughly 3 hours, so start the download promptly.
 
 ## Output
 
