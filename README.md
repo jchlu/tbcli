@@ -7,13 +7,16 @@ Only torrents whose files are currently available are included. Queued, expired,
 ## Requirements
 
 - Python 3.9 or newer (standard library only)
+- Git
 - A TorBox API key
 
 ## Installation
 
-Run the setup script from the repository:
+Clone the repository and run the setup script:
 
 ```bash
+git clone https://github.com/jchlu/tbcli.git
+cd tbcli
 ./install.sh
 ```
 
@@ -21,7 +24,7 @@ The script copies `tbcli.py` to `~/.local/bin/tbcli` and creates an example conf
 
 Set `TB_BIN_DIR` to install somewhere other than `~/.local/bin`.
 
-Then edit the generated config and set `TB_API` to your TorBox API key.
+Then edit the generated config and set `TB_API` to your TorBox API key. See [Where to find your TorBox API key](#where-to-find-your-torbox-api-key).
 
 ### Manual installation
 
@@ -84,9 +87,13 @@ Then add the `TB_API=...` line and save. The file should be mode `600`.
 
 For backwards compatibility, `.env.local` is still read from the script directory first, then the current working directory. It uses the same `KEY=VALUE` format. The XDG config file takes precedence over `.env.local`.
 
-### API key
+### Where to find your TorBox API key
 
-Create or copy an API key from your TorBox account settings. Do not commit the key to this repository. `.env.local`, the XDG config file, and common secret file patterns are ignored by `.gitignore`.
+Create or copy an API key from the TorBox account settings page:
+
+<https://torbox.app/settings?section=account>
+
+Do not commit the key to this repository. `.env.local`, the XDG config file, and common secret file patterns are ignored by `.gitignore`.
 
 ## Usage
 
