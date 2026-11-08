@@ -1,0 +1,4 @@
+# tbcli configuration
+# Get your API key from your TorBox account settings.
+# Keep this file private (mode 600).
+TB_API=your_torbox_api_key_here

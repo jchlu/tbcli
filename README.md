@@ -11,10 +11,24 @@ Only torrents whose files are currently available are included. Queued, expired,
 
 ## Installation
 
+Run the setup script from the repository:
+
+```bash
+./install.sh
+```
+
+The script copies `tbcli.py` to `~/.local/bin/tbcli` and creates an example config at `~/.config/tbcli/config` (or under `$XDG_CONFIG_HOME` if set). Existing config files are never overwritten. It also warns if the install directory is not on your `PATH`.
+
+Set `TB_BIN_DIR` to install somewhere other than `~/.local/bin`.
+
+Then edit the generated config and set `TB_API` to your TorBox API key.
+
+### Manual installation
+
 ```bash
 chmod +x tbcli.py
 mkdir -p ~/.local/bin
-ln -s "$PWD/tbcli.py" ~/.local/bin/tbcli
+cp tbcli.py ~/.local/bin/tbcli
 ```
 
 Make sure `~/.local/bin` is on your `PATH`.
@@ -52,7 +66,7 @@ The file uses simple `KEY=VALUE` lines. Blank lines and lines starting with `#` 
 TB_API=your_torbox_api_key_here
 ```
 
-The only required key is `TB_API`.
+The only required key is `TB_API`. The repository includes `config.example`; `install.sh` copies it to the config location when no config exists.
 
 ### Permissions
 
