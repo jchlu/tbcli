@@ -1,0 +1,54 @@
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+.env.local
+*.local
+config
+config.env
+config.local
+tbcli.conf
+*.key
+*.pem
+*.p12
+*.pfx
+*.token
+*credentials*
+*secret*
+secrets/
+.aws/
+.ssh/
+
+# Generated output (may contain signed, expiring URLs)
+torbox_links.txt
+links.txt
+*.links.txt
+downloads.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.python-version
+*.egg-info/
+build/
+dist/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.log
