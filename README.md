@@ -1,6 +1,6 @@
 # tbcli
 
-A small command-line utility that fetches [TorBox](https://torbox.app) download links for every file in your torrent dashboard and writes them to a text file, one URL per line, for use with a download client. It can also list the torrents currently in your dashboard as a sanity check, or permanently purge all downloads from your dashboard.
+A small command-line utility that fetches [TorBox](https://torbox.app) download links for every file in your torrent dashboard and writes them to a text file, one URL per line, for use with a download client. It can also list the torrents currently in your dashboard as a sanity check, or permanently purge downloads from your dashboard (all of them, or only torrents matching a pattern).
 
 Only torrents whose files are currently available are included. Queued, expired, or otherwise unavailable torrents are skipped.
 
@@ -134,13 +134,13 @@ Options:
 | `-o, --output FILE` | Output file (same as the positional argument) |
 | `-s, --stdout` | Write links to stdout instead of a file (implied by `--list`) |
 | `-l, --list` | List torrents in the dashboard instead of fetching download links; implies `-s`/`--stdout` |
-| `--purge-dashboard` | Permanently delete all downloads in the TorBox dashboard after confirmation |
+| `--purge-dashboard` | Permanently delete downloads in the TorBox dashboard after confirmation; use `-g` to limit it to matching torrents |
 | `-u, --update` | Pull the latest version and reinstall the executable; ignores all other options |
 | `-g, --grep PATTERN` | Only include torrents whose name matches a case-insensitive regular expression |
 | `-c, --config FILE` | Path to the config file |
 | `-e, --env-file FILE` | Path to a legacy `.env.local` file |
 | `-b, --base-url URL` | TorBox API base URL (default: `https://api.torbox.app/v1`) |
-| `-d, --delay SECONDS` | Delay between download-link requests (default: `0.25`) |
+| `-d, --delay SECONDS` | Delay between download-link or purge requests (default: `0.25`) |
 | `-v, --verbose` | Show each torrent/file as it is processed; with `--list`, show files within each torrent |
 
 The default delay keeps request rates comfortably below TorBox's documented limit of 300 requests per minute. Increase it if you still encounter rate limiting.
@@ -157,7 +157,7 @@ tbcli -l -v
 
 The table shows the torrent ID, title, download state, whether the files are present, and the number of files. Add `-v` to list every file within each torrent, including its file ID and size.
 
-`--list` implies `-s`/`--stdout`: the table always goes to stdout, never to a file. It cannot be combined with an output file. The `--grep` filter applies to listing as well.
+`--list` implies `-s`/`--stdout`: the table always goes to stdout, never to a file. It cannot be combined with an output file. The `--grep` filter applies to listing as well, and to `--purge-dashboard`.
 
 ### Purging the dashboard
 
@@ -167,7 +167,15 @@ Use `--purge-dashboard` to permanently delete all torrents, usenet downloads, we
 tbcli --purge-dashboard
 ```
 
-This is destructive and cannot be undone. The command asks you to type `purge` before sending any delete requests. It cannot be combined with an output file, `--list`, `--stdout`, or `--grep`; use the normal `-c`, `-e`, and `-b` options to select the API configuration.
+Add `-g`/`--grep` to purge only the torrents that `tbcli --list --grep PATTERN` would report:
+
+```bash
+tbcli --purge-dashboard -g "ubuntu"
+```
+
+With `--grep`, only matching torrents are deleted; usenet downloads, web downloads, and queued downloads are left untouched. Without `--grep`, everything in the dashboard is purged.
+
+This is destructive and cannot be undone. The command asks you to type `purge` before sending any delete requests. It cannot be combined with an output file, `--list`, or `--stdout`; use the normal `-c`, `-e`, and `-b` options to select the API configuration.
 
 TorBox's documented delete endpoints do not accept a confirmation code. They delete everything when called with `{"operation": "delete", "all": true}`, so tbcli performs the confirmation locally. The confirmation shown by the TorBox dashboard is a UI safeguard, not an API requirement. The account-level `GET /api/user/getconfirmation` endpoint is separate and is not used here.
 

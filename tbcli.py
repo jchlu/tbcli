@@ -306,12 +306,23 @@ def request_download_link(base_url: str, token: str, torrent_id: Any, file_id: A
     return data
 
 
-def confirm_purge() -> bool:
-    print(
-        "This will permanently delete all torrents, usenet downloads, web downloads, "
-        "and queued downloads from your TorBox dashboard.",
-        file=sys.stderr,
-    )
+def confirm_purge(grep_pattern: re.Pattern[str] | None) -> bool:
+    if grep_pattern is None:
+        print(
+            "This will permanently delete all torrents, usenet downloads, web downloads, "
+            "and queued downloads from your TorBox dashboard.",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"This will permanently delete all torrents matching "
+            f"{grep_pattern.pattern!r} from your TorBox dashboard.",
+            file=sys.stderr,
+        )
+        print(
+            "Usenet downloads, web downloads, and queued downloads will be left untouched.",
+            file=sys.stderr,
+        )
     print("Type 'purge' to continue: ", end="", file=sys.stderr, flush=True)
     try:
         answer = input()
@@ -329,7 +340,81 @@ def confirm_purge() -> bool:
     return True
 
 
-def purge_dashboard(args: argparse.Namespace, token: str) -> int:
+def purge_matching_torrents(
+    args: argparse.Namespace,
+    token: str,
+    grep_pattern: re.Pattern[str],
+) -> int:
+    try:
+        torrents = list(fetch_torrents(args.base_url, token, DEFAULT_LIMIT))
+    except ApiError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("\ninterrupted", file=sys.stderr)
+        return 130
+
+    purged = 0
+    filtered = 0
+    failed = 0
+    try:
+        for torrent in torrents:
+            torrent_name = torrent.get("name") or f"id={torrent.get('id')}"
+            if not grep_pattern.search(torrent_name):
+                filtered += 1
+                continue
+            torrent_id = torrent.get("id")
+            if torrent_id is None:
+                failed += 1
+                print(
+                    f"warning: cannot purge torrent without an id: {torrent_name}",
+                    file=sys.stderr,
+                )
+                continue
+            try:
+                request_json(
+                    f"{args.base_url}/api/torrents/controltorrent",
+                    token,
+                    method="POST",
+                    payload={"operation": "delete", "torrent_id": torrent_id, "all": False},
+                )
+            except ApiError as exc:
+                failed += 1
+                print(f"warning: failed to purge {torrent_name}: {exc}", file=sys.stderr)
+            else:
+                purged += 1
+                if args.verbose:
+                    print(f"purged: {torrent_name}", file=sys.stderr)
+            if args.delay > 0:
+                time.sleep(args.delay)
+    except KeyboardInterrupt:
+        print("\ninterrupted", file=sys.stderr)
+        return 130
+
+    if purged == 0 and failed == 0:
+        print("No matching torrents found.", file=sys.stderr)
+        return 0
+
+    details = []
+    if filtered:
+        details.append(f"{filtered} filtered")
+    if failed:
+        details.append(f"{failed} failed")
+    suffix = f" ({', '.join(details)})" if details else ""
+    print(f"Purged {purged} torrents{suffix}.", file=sys.stderr)
+    if failed:
+        return 1
+    return 0
+
+
+def purge_dashboard(
+    args: argparse.Namespace,
+    token: str,
+    grep_pattern: re.Pattern[str] | None,
+) -> int:
+    if grep_pattern is not None:
+        return purge_matching_torrents(args, token, grep_pattern)
+
     targets = [
         ("queued downloads", f"{args.base_url}/api/queued/controlqueued"),
         ("torrents", f"{args.base_url}/api/torrents/controltorrent"),
@@ -469,7 +554,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--purge-dashboard",
         action="store_true",
-        help="permanently delete all downloads from the TorBox dashboard after confirmation",
+        help=(
+            "permanently delete downloads from the TorBox dashboard after confirmation; "
+            "with --grep, only matching torrents"
+        ),
     )
     parser.add_argument(
         "-u",
@@ -481,7 +569,10 @@ def parse_args() -> argparse.Namespace:
         "-g",
         "--grep",
         metavar="PATTERN",
-        help="only include torrents whose name matches this case-insensitive regular expression",
+        help=(
+            "only include or purge torrents whose name matches this "
+            "case-insensitive regular expression"
+        ),
     )
     parser.add_argument("-e", "--env-file", help="path to .env.local (default: script dir, then cwd)")
     parser.add_argument("-c", "--config", help="path to config file (default: $XDG_CONFIG_HOME/tbcli/config)")
@@ -491,7 +582,7 @@ def parse_args() -> argparse.Namespace:
         "--delay",
         type=float,
         default=0.25,
-        help="seconds between download-link requests (default: 0.25)",
+        help="seconds between download-link or purge requests (default: 0.25)",
     )
     parser.add_argument(
         "-v",
@@ -503,9 +594,9 @@ def parse_args() -> argparse.Namespace:
     if args.update:
         return args
     if args.purge_dashboard:
-        if args.output or args.output_flag or args.list or args.stdout or args.grep:
+        if args.output or args.output_flag or args.list or args.stdout:
             parser.error(
-                "--purge-dashboard cannot be combined with output, list, stdout, or grep options"
+                "--purge-dashboard cannot be combined with output, list, or stdout options"
             )
         return args
     if args.output and args.output_flag:
@@ -549,16 +640,16 @@ def main() -> int:
         )
         return 2
 
-    if args.purge_dashboard:
-        if not confirm_purge():
-            return 1
-        return purge_dashboard(args, token)
-
     try:
-        grep_pattern = re.compile(args.grep, re.IGNORECASE) if args.grep else None
+        grep_pattern = re.compile(args.grep, re.IGNORECASE) if args.grep is not None else None
     except re.error as exc:
         print(f"error: invalid --grep pattern: {exc}", file=sys.stderr)
         return 2
+
+    if args.purge_dashboard:
+        if not confirm_purge(grep_pattern):
+            return 1
+        return purge_dashboard(args, token, grep_pattern)
 
     if args.list:
         return list_torrents(args, token, grep_pattern)
