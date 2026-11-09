@@ -115,10 +115,6 @@ def update_installation() -> int:
         else:
             target = running
 
-    before = git_head(repo)
-    if not before:
-        print("error: cannot determine current git revision", file=sys.stderr)
-        return 1
     result = subprocess.run(
         ["git", "-C", str(repo), "pull", "--ff-only"],
         capture_output=True,
@@ -135,9 +131,6 @@ def update_installation() -> int:
     if not after:
         print("error: cannot determine updated git revision", file=sys.stderr)
         return 1
-    if before == after:
-        print("Already up to date.")
-        return 0
 
     source = git_output(repo, "show", "HEAD:tbcli.py")
     if source.returncode != 0:
@@ -148,6 +141,14 @@ def update_installation() -> int:
     except SyntaxError as exc:
         print(f"error: updated tbcli.py is invalid: {exc}", file=sys.stderr)
         return 1
+
+    try:
+        installed = target.read_bytes()
+    except OSError:
+        installed = None
+    if installed == source.stdout and os.access(target, os.X_OK):
+        print("Already up to date.")
+        return 0
 
     try:
         target.parent.mkdir(parents=True, exist_ok=True)

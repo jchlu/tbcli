@@ -38,13 +38,13 @@ Make sure `~/.local/bin` is on your `PATH`.
 
 ### Updating
 
-`install.sh` records the repository and executable paths in `$XDG_CONFIG_HOME/tbcli/install` (`~/.config/tbcli/install` by default). To pull the latest version and replace the installed executable when new commits are available:
+`install.sh` records the repository and executable paths in `$XDG_CONFIG_HOME/tbcli/install` (`~/.config/tbcli/install` by default). To pull the latest version and reinstall the installed executable:
 
 ```bash
 tbcli -u
 ```
 
-`-u` is a standalone mode: any other options or output filename are ignored. If you installed manually or moved the repository, set `TB_REPO` to the repository path and optionally `TB_INSTALL_PATH` to the installed executable before running the update.
+`-u` is a standalone mode: any other options or output filename are ignored. It also reinstalls when the installed executable differs from the repository's current `HEAD`, even if `git pull` brought no new commits. If you installed manually or moved the repository, set `TB_REPO` to the repository path and optionally `TB_INSTALL_PATH` to the installed executable before running the update.
 
 ## Configuration
 
