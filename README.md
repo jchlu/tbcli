@@ -101,7 +101,7 @@ Do not commit the key to this repository. `.env.local`, the XDG config file, and
 tbcli [OUTPUT] [options]
 ```
 
-`OUTPUT` is the file to write links to. If omitted, it defaults to `torbox_links.txt`. You can also use `-o FILE`; specifying both is an error. Use `--stdout` to write links to stdout instead of a file.
+`OUTPUT` is the file to write links to. If omitted, it defaults to `torbox_links.txt`. You can also use `-o FILE`; specifying both is an error. Use `-s`/`--stdout` to write links to stdout instead of a file.
 
 Examples:
 
@@ -120,13 +120,12 @@ Options:
 | Option | Description |
 | --- | --- |
 | `-o, --output FILE` | Output file (same as the positional argument) |
-| `--stdout` | Write links to stdout instead of a file (implied by `--list`) |
-| `-l, --list` | List torrents in the dashboard instead of fetching download links; implies `--stdout` |
+| `-s, --stdout` | Write links to stdout instead of a file (implied by `--list`) |
+| `-l, --list` | List torrents in the dashboard instead of fetching download links; implies `-s`/`--stdout` |
 | `-g, --grep PATTERN` | Only include torrents whose name matches a case-insensitive regular expression |
 | `--config FILE` | Path to the config file |
 | `--env-file FILE` | Path to a legacy `.env.local` file |
 | `--base-url URL` | TorBox API base URL (default: `https://api.torbox.app/v1`) |
-| `--limit N` | Torrents requested per API page (default: `1000`) |
 | `--delay SECONDS` | Delay between download-link requests (default: `0.25`) |
 | `-v, --verbose` | Show each torrent/file as it is processed; with `--list`, show files within each torrent |
 
@@ -144,7 +143,7 @@ tbcli -l -v
 
 The table shows the torrent ID, title, download state, whether the files are present, and the number of files. Add `-v` to list every file within each torrent, including its file ID and size.
 
-`--list` implies `--stdout`: the table always goes to stdout, never to a file. It cannot be combined with an output file. The `--grep` filter applies to listing as well.
+`--list` implies `-s`/`--stdout`: the table always goes to stdout, never to a file. It cannot be combined with an output file. The `--grep` filter applies to listing as well.
 
 ### Filtering torrents
 
@@ -159,10 +158,10 @@ Matching applies to torrent names only. Quote patterns that contain shell metach
 
 ### Piping to a download client
 
-Use `--stdout` to write only the links to stdout, leaving progress and the summary on stderr so the output can be piped directly. For example, [aria2c](https://aria2.github.io/) accepts newline-separated URLs on stdin with `-i -`:
+Use `-s`/`--stdout` to write only the links to stdout, leaving progress and the summary on stderr so the output can be piped directly. For example, [aria2c](https://aria2.github.io/) accepts newline-separated URLs on stdin with `-i -`:
 
 ```bash
-tbcli --stdout | aria2c -i -
+tbcli -s | aria2c -i -
 ```
 
 aria2c is an external dependency and is not installed by `install.sh`. Install it separately with your package manager, for example on Debian/Ubuntu:

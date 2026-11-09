@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 
 DEFAULT_BASE_URL = "https://api.torbox.app/v1"
 DEFAULT_OUTPUT = "torbox_links.txt"
+DEFAULT_LIMIT = 1000
 APP_NAME = "tbcli"
 CONFIG_FILENAME = "config"
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
@@ -246,7 +247,7 @@ def list_torrents(args: argparse.Namespace, token: str, grep_pattern: re.Pattern
     filtered_count = 0
 
     try:
-        for torrent in fetch_torrents(args.base_url, token, args.limit):
+        for torrent in fetch_torrents(args.base_url, token, DEFAULT_LIMIT):
             torrent_name = torrent.get("name") or f"id={torrent.get('id')}"
             if grep_pattern and not grep_pattern.search(torrent_name):
                 filtered_count += 1
@@ -282,7 +283,7 @@ def parse_args() -> argparse.Namespace:
         help=f"output file (default: {DEFAULT_OUTPUT})",
     )
     parser.add_argument("-o", "--output", dest="output_flag", metavar="FILE", help="output file (same as positional)")
-    parser.add_argument("--stdout", action="store_true", help="write links to stdout instead of a file")
+    parser.add_argument("-s", "--stdout", action="store_true", help="write links to stdout instead of a file")
     parser.add_argument("-l", "--list", action="store_true", help="list torrents instead of fetching download links")
     parser.add_argument(
         "-g",
@@ -293,7 +294,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--env-file", help="path to .env.local (default: script dir, then cwd)")
     parser.add_argument("--config", help="path to config file (default: $XDG_CONFIG_HOME/tbcli/config)")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"TorBox API base URL (default: {DEFAULT_BASE_URL})")
-    parser.add_argument("--limit", type=int, default=1000, help="torrents per API page (default: 1000)")
     parser.add_argument(
         "--delay",
         type=float,
@@ -310,9 +310,9 @@ def parse_args() -> argparse.Namespace:
     if args.output and args.output_flag:
         parser.error("specify the output file either positionally or with -o, not both")
     if args.stdout and (args.output or args.output_flag):
-        parser.error("--stdout cannot be combined with an output file")
+        parser.error("-s/--stdout cannot be combined with an output file")
     if args.list and (args.output or args.output_flag):
-        parser.error("--list implies --stdout and cannot be combined with an output file")
+        parser.error("--list implies -s/--stdout and cannot be combined with an output file")
     if args.list:
         args.stdout = True
     args.output = None if args.stdout else (args.output or args.output_flag or DEFAULT_OUTPUT)
@@ -362,7 +362,7 @@ def main() -> int:
     failed_count = 0
 
     try:
-        torrents = fetch_torrents(args.base_url, token, args.limit)
+        torrents = fetch_torrents(args.base_url, token, DEFAULT_LIMIT)
         for torrent in torrents:
             torrent_name = torrent.get("name") or f"id={torrent.get('id')}"
             torrent_id = torrent.get("id")
