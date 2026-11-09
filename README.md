@@ -108,6 +108,7 @@ Examples:
 ```bash
 tbcli links.txt
 tbcli -o links.txt
+tbcli -g "ubuntu" links.txt
 tbcli --config /path/to/config links.txt
 tbcli -v links.txt
 ```
@@ -118,6 +119,7 @@ Options:
 | --- | --- |
 | `-o, --output FILE` | Output file (same as the positional argument) |
 | `--stdout` | Write links to stdout instead of a file |
+| `-g, --grep PATTERN` | Only include torrents whose name matches a case-insensitive regular expression |
 | `--config FILE` | Path to the config file |
 | `--env-file FILE` | Path to a legacy `.env.local` file |
 | `--base-url URL` | TorBox API base URL (default: `https://api.torbox.app/v1`) |
@@ -126,6 +128,17 @@ Options:
 | `-v, --verbose` | Show each torrent/file as it is processed |
 
 The default delay keeps request rates comfortably below TorBox's documented limit of 300 requests per minute. Increase it if you still encounter rate limiting.
+
+### Filtering torrents
+
+Use `-g`/`--grep` to limit the run to torrents whose name matches a case-insensitive regular expression. This is useful when old torrents are still in the dashboard but you only want a specific set of files:
+
+```bash
+tbcli --grep "ubuntu" links.txt
+tbcli -g "S[0-9]{2}E[0-9]{2}" --stdout | aria2c -i -
+```
+
+Matching applies to torrent names only. Quote patterns that contain shell metacharacters. Non-matching torrents are counted in the summary as filtered.
 
 ### Piping to a download client
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -190,6 +191,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("-o", "--output", dest="output_flag", metavar="FILE", help="output file (same as positional)")
     parser.add_argument("--stdout", action="store_true", help="write links to stdout instead of a file")
+    parser.add_argument(
+        "-g",
+        "--grep",
+        metavar="PATTERN",
+        help="only include torrents whose name matches this case-insensitive regular expression",
+    )
     parser.add_argument("--env-file", help="path to .env.local (default: script dir, then cwd)")
     parser.add_argument("--config", help="path to config file (default: $XDG_CONFIG_HOME/tbcli/config)")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"TorBox API base URL (default: {DEFAULT_BASE_URL})")
@@ -236,9 +243,16 @@ def main() -> int:
         )
         return 2
 
+    try:
+        grep_pattern = re.compile(args.grep, re.IGNORECASE) if args.grep else None
+    except re.error as exc:
+        print(f"error: invalid --grep pattern: {exc}", file=sys.stderr)
+        return 2
+
     output_path = None if args.stdout else Path(args.output).expanduser()
     links: list[str] = []
     torrent_count = 0
+    filtered_count = 0
     skipped_count = 0
     failed_count = 0
 
@@ -247,6 +261,12 @@ def main() -> int:
         for torrent in torrents:
             torrent_name = torrent.get("name") or f"id={torrent.get('id')}"
             torrent_id = torrent.get("id")
+
+            if grep_pattern and not grep_pattern.search(torrent_name):
+                filtered_count += 1
+                if args.verbose:
+                    print(f"skip (no grep match): {torrent_name}", file=sys.stderr)
+                continue
 
             if not is_downloadable(torrent):
                 skipped_count += 1
@@ -308,9 +328,17 @@ def main() -> int:
             return 1
         destination = str(output_path)
 
+    summary = []
+    if filtered_count:
+        summary.append(f"{filtered_count} torrents filtered")
+    if skipped_count:
+        summary.append(f"{skipped_count} torrents skipped")
+    if failed_count:
+        summary.append(f"{failed_count} files failed")
+    suffix = f" ({', '.join(summary)})" if summary else ""
+
     print(
-        f"Wrote {len(links)} links from {torrent_count} torrents to {destination}"
-        + (f" ({skipped_count} torrents skipped, {failed_count} files failed)" if skipped_count or failed_count else ""),
+        f"Wrote {len(links)} links from {torrent_count} torrents to {destination}{suffix}",
         file=sys.stderr,
     )
     return 1 if failed_count else 0
