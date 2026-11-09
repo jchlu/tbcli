@@ -1,6 +1,6 @@
 # tbcli
 
-A small command-line utility that fetches [TorBox](https://torbox.app) download links for every file in your torrent dashboard and writes them to a text file, one URL per line, for use with a download client.
+A small command-line utility that fetches [TorBox](https://torbox.app) download links for every file in your torrent dashboard and writes them to a text file, one URL per line, for use with a download client. It can also list the torrents currently in your dashboard as a sanity check.
 
 Only torrents whose files are currently available are included. Queued, expired, or otherwise unavailable torrents are skipped.
 
@@ -111,6 +111,8 @@ tbcli -o links.txt
 tbcli -g "ubuntu" links.txt
 tbcli --config /path/to/config links.txt
 tbcli -v links.txt
+tbcli --list
+tbcli -l -v
 ```
 
 Options:
@@ -118,16 +120,31 @@ Options:
 | Option | Description |
 | --- | --- |
 | `-o, --output FILE` | Output file (same as the positional argument) |
-| `--stdout` | Write links to stdout instead of a file |
+| `--stdout` | Write links to stdout instead of a file (implied by `--list`) |
+| `-l, --list` | List torrents in the dashboard instead of fetching download links; implies `--stdout` |
 | `-g, --grep PATTERN` | Only include torrents whose name matches a case-insensitive regular expression |
 | `--config FILE` | Path to the config file |
 | `--env-file FILE` | Path to a legacy `.env.local` file |
 | `--base-url URL` | TorBox API base URL (default: `https://api.torbox.app/v1`) |
 | `--limit N` | Torrents requested per API page (default: `1000`) |
 | `--delay SECONDS` | Delay between download-link requests (default: `0.25`) |
-| `-v, --verbose` | Show each torrent/file as it is processed |
+| `-v, --verbose` | Show each torrent/file as it is processed; with `--list`, show files within each torrent |
 
 The default delay keeps request rates comfortably below TorBox's documented limit of 300 requests per minute. Increase it if you still encounter rate limiting.
+
+### Listing torrents
+
+Use `-l`/`--list` to print a table of the torrents currently in your TorBox dashboard without fetching any download links:
+
+```bash
+tbcli --list
+tbcli -l --grep "ubuntu"
+tbcli -l -v
+```
+
+The table shows the torrent ID, title, download state, whether the files are present, and the number of files. Add `-v` to list every file within each torrent, including its file ID and size.
+
+`--list` implies `--stdout`: the table always goes to stdout, never to a file. It cannot be combined with an output file. The `--grep` filter applies to listing as well.
 
 ### Filtering torrents
 

@@ -180,6 +180,98 @@ def request_download_link(base_url: str, token: str, torrent_id: Any, file_id: A
     return data
 
 
+def human_size(size: Any) -> str:
+    try:
+        value = float(size)
+    except (TypeError, ValueError):
+        return ""
+    units = ("B", "KiB", "MiB", "GiB", "TiB", "PiB")
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            return f"{int(value)} B" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    return ""
+
+
+def availability_label(torrent: dict[str, Any]) -> str:
+    if "download_present" in torrent:
+        return "yes" if torrent.get("download_present") else "no"
+    if torrent.get("download_finished") is True:
+        return "yes"
+    return "-"
+
+
+def print_torrent_table(torrents: list[dict[str, Any]], verbose: bool) -> None:
+    headers = ("ID", "TITLE", "STATE", "PRESENT", "FILES")
+    rows = []
+    for torrent in torrents:
+        files = torrent.get("files")
+        if not isinstance(files, list):
+            files = []
+        rows.append(
+            (
+                str(torrent.get("id", "?")),
+                torrent.get("name") or f"id={torrent.get('id')}",
+                torrent.get("download_state") or "-",
+                availability_label(torrent),
+                str(len(files)),
+            )
+        )
+
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+
+    print("  ".join(cell.ljust(widths[index]) for index, cell in enumerate(headers)).rstrip())
+    for torrent, row in zip(torrents, rows):
+        print("  ".join(cell.ljust(widths[index]) for index, cell in enumerate(row)).rstrip())
+        if not verbose:
+            continue
+        files = torrent.get("files")
+        if not isinstance(files, list):
+            continue
+        for file_info in files:
+            if not isinstance(file_info, dict):
+                continue
+            file_id = file_info.get("id", "?")
+            file_name = file_info.get("short_name") or file_info.get("name") or "?"
+            size = human_size(file_info.get("size"))
+            suffix = f" ({size})" if size else ""
+            print(f"    [{file_id}] {file_name}{suffix}")
+
+
+def list_torrents(args: argparse.Namespace, token: str, grep_pattern: re.Pattern[str] | None) -> int:
+    torrents: list[dict[str, Any]] = []
+    filtered_count = 0
+
+    try:
+        for torrent in fetch_torrents(args.base_url, token, args.limit):
+            torrent_name = torrent.get("name") or f"id={torrent.get('id')}"
+            if grep_pattern and not grep_pattern.search(torrent_name):
+                filtered_count += 1
+                continue
+            torrents.append(torrent)
+    except ApiError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("\ninterrupted", file=sys.stderr)
+        return 130
+
+    if not torrents:
+        message = "No torrents found."
+        if filtered_count:
+            message += f" ({filtered_count} torrents filtered)"
+        print(message, file=sys.stderr)
+        return 0
+
+    print_torrent_table(torrents, args.verbose)
+    suffix = f" ({filtered_count} torrents filtered)" if filtered_count else ""
+    print(f"Listed {len(torrents)} torrents{suffix}", file=sys.stderr)
+    return 0
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Write TorBox download links for all available torrent files, one per line."
@@ -191,6 +283,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("-o", "--output", dest="output_flag", metavar="FILE", help="output file (same as positional)")
     parser.add_argument("--stdout", action="store_true", help="write links to stdout instead of a file")
+    parser.add_argument("-l", "--list", action="store_true", help="list torrents instead of fetching download links")
     parser.add_argument(
         "-g",
         "--grep",
@@ -207,12 +300,21 @@ def parse_args() -> argparse.Namespace:
         default=0.25,
         help="seconds between download-link requests (default: 0.25)",
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="show each file as it is processed")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="show each file as it is processed; with --list, show files within each torrent",
+    )
     args = parser.parse_args()
     if args.output and args.output_flag:
         parser.error("specify the output file either positionally or with -o, not both")
     if args.stdout and (args.output or args.output_flag):
         parser.error("--stdout cannot be combined with an output file")
+    if args.list and (args.output or args.output_flag):
+        parser.error("--list implies --stdout and cannot be combined with an output file")
+    if args.list:
+        args.stdout = True
     args.output = None if args.stdout else (args.output or args.output_flag or DEFAULT_OUTPUT)
     return args
 
@@ -248,6 +350,9 @@ def main() -> int:
     except re.error as exc:
         print(f"error: invalid --grep pattern: {exc}", file=sys.stderr)
         return 2
+
+    if args.list:
+        return list_torrents(args, token, grep_pattern)
 
     output_path = None if args.stdout else Path(args.output).expanduser()
     links: list[str] = []
