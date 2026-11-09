@@ -20,7 +20,7 @@ cd tbcli
 ./install.sh
 ```
 
-The script copies `tbcli.py` to `~/.local/bin/tbcli` and creates an example config at `~/.config/tbcli/config` (or under `$XDG_CONFIG_HOME` if set). Existing config files are never overwritten. It also warns if the install directory is not on your `PATH`.
+The script copies `tbcli.py` to `~/.local/bin/tbcli` and creates an example config at `~/.config/tbcli/config` (or under `$XDG_CONFIG_HOME` if set). Existing config files are never overwritten. It also records the repository and executable paths so `tbcli -u` can update itself, and warns if the install directory is not on your `PATH`.
 
 Set `TB_BIN_DIR` to install somewhere other than `~/.local/bin`.
 
@@ -35,6 +35,16 @@ cp tbcli.py ~/.local/bin/tbcli
 ```
 
 Make sure `~/.local/bin` is on your `PATH`.
+
+### Updating
+
+`install.sh` records the repository and executable paths in `$XDG_CONFIG_HOME/tbcli/install` (`~/.config/tbcli/install` by default). To pull the latest version and replace the installed executable when new commits are available:
+
+```bash
+tbcli -u
+```
+
+`-u` is a standalone mode: any other options or output filename are ignored. If you installed manually or moved the repository, set `TB_REPO` to the repository path and optionally `TB_INSTALL_PATH` to the installed executable before running the update.
 
 ## Configuration
 
@@ -113,6 +123,7 @@ tbcli -c /path/to/config links.txt
 tbcli -v links.txt
 tbcli --list
 tbcli -l -v
+tbcli -u
 ```
 
 Options:
@@ -122,6 +133,7 @@ Options:
 | `-o, --output FILE` | Output file (same as the positional argument) |
 | `-s, --stdout` | Write links to stdout instead of a file (implied by `--list`) |
 | `-l, --list` | List torrents in the dashboard instead of fetching download links; implies `-s`/`--stdout` |
+| `-u, --update` | Pull the latest version and reinstall the executable; ignores all other options |
 | `-g, --grep PATTERN` | Only include torrents whose name matches a case-insensitive regular expression |
 | `-c, --config FILE` | Path to the config file |
 | `-e, --env-file FILE` | Path to a legacy `.env.local` file |

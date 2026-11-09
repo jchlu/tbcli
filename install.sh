@@ -25,6 +25,7 @@ if [[ ! -f "$SOURCE" ]]; then
 fi
 
 mkdir -p "$BIN_DIR"
+BIN_DIR="$(cd -- "$BIN_DIR" && pwd)"
 install -m 755 "$SOURCE" "$BIN_DIR/tbcli"
 
 mkdir -p "$CONFIG_DIR"
@@ -41,6 +42,13 @@ else
     chmod 600 "$CONFIG_FILE"
     echo "Created example config: $CONFIG_FILE"
 fi
+
+STATE_FILE="$CONFIG_DIR/install"
+{
+    printf 'TB_REPO=%s\n' "$SCRIPT_DIR"
+    printf 'TB_INSTALL_PATH=%s\n' "$BIN_DIR/tbcli"
+} >"$STATE_FILE"
+chmod 600 "$STATE_FILE"
 
 echo "Installed executable: $BIN_DIR/tbcli"
 

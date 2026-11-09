@@ -7,7 +7,10 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Iterator
@@ -38,9 +41,10 @@ def config_path() -> Path:
     return xdg_config_home() / APP_NAME / CONFIG_FILENAME
 
 
-def load_env_file(path: Path) -> None:
+def parse_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
     if not path.is_file():
-        return
+        return values
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -48,8 +52,123 @@ def load_env_file(path: Path) -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip().strip("'\"")
-        if key and not os.environ.get(key):
+        if key:
+            values[key] = value
+    return values
+
+
+def load_env_file(path: Path) -> None:
+    for key, value in parse_env_file(path).items():
+        if not os.environ.get(key):
             os.environ[key] = value
+
+
+def install_state_path() -> Path:
+    return config_path().with_name("install")
+
+
+def git_output(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        check=False,
+    )
+
+
+def git_head(repo: Path) -> str:
+    result = git_output(repo, "rev-parse", "HEAD")
+    if result.returncode != 0:
+        return ""
+    return result.stdout.decode("utf-8", "replace").strip()
+
+
+def update_installation() -> int:
+    if shutil.which("git") is None:
+        print("error: git is required for --update", file=sys.stderr)
+        return 2
+
+    state = parse_env_file(install_state_path())
+    repo_value = os.environ.get("TB_REPO") or state.get("TB_REPO")
+    if not repo_value:
+        candidate = Path(__file__).resolve().parent
+        if (candidate / ".git").exists():
+            repo_value = str(candidate)
+    if not repo_value:
+        print(
+            "error: cannot locate the source repository; re-run install.sh or set TB_REPO",
+            file=sys.stderr,
+        )
+        return 2
+
+    repo = Path(repo_value).expanduser().resolve()
+    if not (repo / ".git").exists():
+        print(f"error: not a git repository: {repo}", file=sys.stderr)
+        return 2
+
+    target_value = os.environ.get("TB_INSTALL_PATH") or state.get("TB_INSTALL_PATH")
+    if target_value:
+        target = Path(target_value).expanduser()
+    else:
+        running = Path(sys.argv[0]).resolve()
+        if running.parent == repo:
+            target = Path.home() / ".local" / "bin" / "tbcli"
+        else:
+            target = running
+
+    before = git_head(repo)
+    if not before:
+        print("error: cannot determine current git revision", file=sys.stderr)
+        return 1
+    result = subprocess.run(
+        ["git", "-C", str(repo), "pull", "--ff-only"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        if detail:
+            print(detail, file=sys.stderr)
+        print("error: git pull failed", file=sys.stderr)
+        return 1
+
+    after = git_head(repo)
+    if not after:
+        print("error: cannot determine updated git revision", file=sys.stderr)
+        return 1
+    if before == after:
+        print("Already up to date.")
+        return 0
+
+    source = git_output(repo, "show", "HEAD:tbcli.py")
+    if source.returncode != 0:
+        print("error: cannot read tbcli.py from the updated repository", file=sys.stderr)
+        return 1
+    try:
+        compile(source.stdout, "tbcli.py", "exec")
+    except SyntaxError as exc:
+        print(f"error: updated tbcli.py is invalid: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd, temp_name = tempfile.mkstemp(prefix=".tbcli-", dir=target.parent)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(source.stdout)
+            os.chmod(temp_name, 0o755)
+            os.replace(temp_name, target)
+        except BaseException:
+            try:
+                os.unlink(temp_name)
+            except OSError:
+                pass
+            raise
+    except OSError as exc:
+        print(f"error: cannot update {target}: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Updated {target} to {after[:7]}.")
+    return 0
 
 
 def find_config_file(explicit: str | None) -> Path | None:
@@ -286,6 +405,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-s", "--stdout", action="store_true", help="write links to stdout instead of a file")
     parser.add_argument("-l", "--list", action="store_true", help="list torrents instead of fetching download links")
     parser.add_argument(
+        "-u",
+        "--update",
+        action="store_true",
+        help="pull the latest version and reinstall the executable; ignores all other options",
+    )
+    parser.add_argument(
         "-g",
         "--grep",
         metavar="PATTERN",
@@ -308,6 +433,8 @@ def parse_args() -> argparse.Namespace:
         help="show each file as it is processed; with --list, show files within each torrent",
     )
     args = parser.parse_args()
+    if args.update:
+        return args
     if args.output and args.output_flag:
         parser.error("specify the output file either positionally or with -o, not both")
     if args.stdout and (args.output or args.output_flag):
@@ -322,6 +449,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+
+    if args.update:
+        return update_installation()
 
     config_file = find_config_file(args.config)
     if config_file:
