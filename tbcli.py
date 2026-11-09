@@ -291,10 +291,11 @@ def parse_args() -> argparse.Namespace:
         metavar="PATTERN",
         help="only include torrents whose name matches this case-insensitive regular expression",
     )
-    parser.add_argument("--env-file", help="path to .env.local (default: script dir, then cwd)")
-    parser.add_argument("--config", help="path to config file (default: $XDG_CONFIG_HOME/tbcli/config)")
-    parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"TorBox API base URL (default: {DEFAULT_BASE_URL})")
+    parser.add_argument("-e", "--env-file", help="path to .env.local (default: script dir, then cwd)")
+    parser.add_argument("-c", "--config", help="path to config file (default: $XDG_CONFIG_HOME/tbcli/config)")
+    parser.add_argument("-b", "--base-url", default=DEFAULT_BASE_URL, help=f"TorBox API base URL (default: {DEFAULT_BASE_URL})")
     parser.add_argument(
+        "-d",
         "--delay",
         type=float,
         default=0.25,

@@ -58,7 +58,7 @@ If `XDG_CONFIG_HOME` is unset or is not an absolute path, the default is:
 ~/.config/tbcli/config
 ```
 
-Use `--config FILE` to point at a different file.
+Use `-c`/`--config FILE` to point at a different file.
 
 ### Config file format
 
@@ -109,7 +109,7 @@ Examples:
 tbcli links.txt
 tbcli -o links.txt
 tbcli -g "ubuntu" links.txt
-tbcli --config /path/to/config links.txt
+tbcli -c /path/to/config links.txt
 tbcli -v links.txt
 tbcli --list
 tbcli -l -v
@@ -123,10 +123,10 @@ Options:
 | `-s, --stdout` | Write links to stdout instead of a file (implied by `--list`) |
 | `-l, --list` | List torrents in the dashboard instead of fetching download links; implies `-s`/`--stdout` |
 | `-g, --grep PATTERN` | Only include torrents whose name matches a case-insensitive regular expression |
-| `--config FILE` | Path to the config file |
-| `--env-file FILE` | Path to a legacy `.env.local` file |
-| `--base-url URL` | TorBox API base URL (default: `https://api.torbox.app/v1`) |
-| `--delay SECONDS` | Delay between download-link requests (default: `0.25`) |
+| `-c, --config FILE` | Path to the config file |
+| `-e, --env-file FILE` | Path to a legacy `.env.local` file |
+| `-b, --base-url URL` | TorBox API base URL (default: `https://api.torbox.app/v1`) |
+| `-d, --delay SECONDS` | Delay between download-link requests (default: `0.25`) |
 | `-v, --verbose` | Show each torrent/file as it is processed; with `--list`, show files within each torrent |
 
 The default delay keeps request rates comfortably below TorBox's documented limit of 300 requests per minute. Increase it if you still encounter rate limiting.
