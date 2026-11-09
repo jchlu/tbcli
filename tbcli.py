@@ -196,17 +196,22 @@ def request_json(
     params: dict[str, Any] | None = None,
     retries: int = 3,
     timeout: float = 60.0,
+    *,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
 ) -> Any:
     if params:
         url = f"{url}?{urlencode(params)}"
-    request = Request(
-        url,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json",
-            "User-Agent": "tbcli/1.0",
-        },
-    )
+    data = None
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": "tbcli/1.0",
+    }
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = Request(url, data=data, headers=headers, method=method)
 
     for attempt in range(retries + 1):
         try:
@@ -298,6 +303,62 @@ def request_download_link(base_url: str, token: str, torrent_id: Any, file_id: A
     if not isinstance(data, str) or not data:
         raise ApiError("response did not contain a download link")
     return data
+
+
+def confirm_purge() -> bool:
+    print(
+        "This will permanently delete all torrents, usenet downloads, web downloads, "
+        "and queued downloads from your TorBox dashboard.",
+        file=sys.stderr,
+    )
+    print("Type 'purge' to continue: ", end="", file=sys.stderr, flush=True)
+    try:
+        answer = input()
+    except EOFError:
+        print("\nPurge cancelled.", file=sys.stderr)
+        return False
+    except KeyboardInterrupt:
+        print("\nPurge cancelled.", file=sys.stderr)
+        return False
+    if not sys.stdin.isatty():
+        print(file=sys.stderr)
+    if answer.strip() != "purge":
+        print("Purge cancelled.", file=sys.stderr)
+        return False
+    return True
+
+
+def purge_dashboard(args: argparse.Namespace, token: str) -> int:
+    targets = [
+        ("queued downloads", f"{args.base_url}/api/queued/controlqueued"),
+        ("torrents", f"{args.base_url}/api/torrents/controltorrent"),
+        ("usenet downloads", f"{args.base_url}/api/usenet/controlusenetdownload"),
+        ("web downloads", f"{args.base_url}/api/webdl/controlwebdownload"),
+    ]
+    failed = 0
+    try:
+        for label, url in targets:
+            try:
+                request_json(
+                    url,
+                    token,
+                    method="POST",
+                    payload={"operation": "delete", "all": True},
+                )
+            except ApiError as exc:
+                failed += 1
+                print(f"warning: failed to purge {label}: {exc}", file=sys.stderr)
+                continue
+            print(f"Purged {label}.", file=sys.stderr)
+    except KeyboardInterrupt:
+        print("\ninterrupted", file=sys.stderr)
+        return 130
+
+    if failed:
+        print(f"Purge finished with {failed} failure(s).", file=sys.stderr)
+        return 1
+    print("TorBox dashboard purged.", file=sys.stderr)
+    return 0
 
 
 def human_size(size: Any) -> str:
@@ -405,6 +466,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-s", "--stdout", action="store_true", help="write links to stdout instead of a file")
     parser.add_argument("-l", "--list", action="store_true", help="list torrents instead of fetching download links")
     parser.add_argument(
+        "--purge-dashboard",
+        action="store_true",
+        help="permanently delete all downloads from the TorBox dashboard after confirmation",
+    )
+    parser.add_argument(
         "-u",
         "--update",
         action="store_true",
@@ -434,6 +500,12 @@ def parse_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
     if args.update:
+        return args
+    if args.purge_dashboard:
+        if args.output or args.output_flag or args.list or args.stdout or args.grep:
+            parser.error(
+                "--purge-dashboard cannot be combined with output, list, stdout, or grep options"
+            )
         return args
     if args.output and args.output_flag:
         parser.error("specify the output file either positionally or with -o, not both")
@@ -475,6 +547,11 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+
+    if args.purge_dashboard:
+        if not confirm_purge():
+            return 1
+        return purge_dashboard(args, token)
 
     try:
         grep_pattern = re.compile(args.grep, re.IGNORECASE) if args.grep else None

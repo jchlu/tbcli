@@ -1,6 +1,6 @@
 # tbcli
 
-A small command-line utility that fetches [TorBox](https://torbox.app) download links for every file in your torrent dashboard and writes them to a text file, one URL per line, for use with a download client. It can also list the torrents currently in your dashboard as a sanity check.
+A small command-line utility that fetches [TorBox](https://torbox.app) download links for every file in your torrent dashboard and writes them to a text file, one URL per line, for use with a download client. It can also list the torrents currently in your dashboard as a sanity check, or permanently purge all downloads from your dashboard.
 
 Only torrents whose files are currently available are included. Queued, expired, or otherwise unavailable torrents are skipped.
 
@@ -123,6 +123,7 @@ tbcli -c /path/to/config links.txt
 tbcli -v links.txt
 tbcli --list
 tbcli -l -v
+tbcli --purge-dashboard
 tbcli -u
 ```
 
@@ -133,6 +134,7 @@ Options:
 | `-o, --output FILE` | Output file (same as the positional argument) |
 | `-s, --stdout` | Write links to stdout instead of a file (implied by `--list`) |
 | `-l, --list` | List torrents in the dashboard instead of fetching download links; implies `-s`/`--stdout` |
+| `--purge-dashboard` | Permanently delete all downloads in the TorBox dashboard after confirmation |
 | `-u, --update` | Pull the latest version and reinstall the executable; ignores all other options |
 | `-g, --grep PATTERN` | Only include torrents whose name matches a case-insensitive regular expression |
 | `-c, --config FILE` | Path to the config file |
@@ -156,6 +158,18 @@ tbcli -l -v
 The table shows the torrent ID, title, download state, whether the files are present, and the number of files. Add `-v` to list every file within each torrent, including its file ID and size.
 
 `--list` implies `-s`/`--stdout`: the table always goes to stdout, never to a file. It cannot be combined with an output file. The `--grep` filter applies to listing as well.
+
+### Purging the dashboard
+
+Use `--purge-dashboard` to permanently delete all torrents, usenet downloads, web downloads, and queued downloads from your TorBox dashboard:
+
+```bash
+tbcli --purge-dashboard
+```
+
+This is destructive and cannot be undone. The command asks you to type `purge` before sending any delete requests. It cannot be combined with an output file, `--list`, `--stdout`, or `--grep`; use the normal `-c`, `-e`, and `-b` options to select the API configuration.
+
+TorBox's documented delete endpoints do not accept a confirmation code. They delete everything when called with `{"operation": "delete", "all": true}`, so tbcli performs the confirmation locally. The confirmation shown by the TorBox dashboard is a UI safeguard, not an API requirement. The account-level `GET /api/user/getconfirmation` endpoint is separate and is not used here.
 
 ### Filtering torrents
 
@@ -195,8 +209,8 @@ The same pattern works with any download client that accepts newline-separated U
 
 | Code | Meaning |
 | --- | --- |
-| `0` | All requested links were written |
-| `1` | One or more file requests failed, or the output file could not be written |
+| `0` | All requested links were written, or the purge completed successfully |
+| `1` | One or more file or purge requests failed, the output file could not be written, or the purge was cancelled |
 | `2` | Configuration error (missing `TB_API`, missing explicit config/env file) |
 | `130` | Interrupted with Ctrl-C |
 
